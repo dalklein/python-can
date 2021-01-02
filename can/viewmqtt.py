@@ -96,7 +96,7 @@ class CanViewMQTT:
             key = self.stdscr.getch()
 
             # Stop program if the user presses ESC or 'q'
-            if key == KEY_ESC or key == ord('q') or key == ord('p'):
+            if key == KEY_ESC or key == ord('q'):
                 break
 
             # Clear by pressing 'c'
@@ -164,11 +164,12 @@ class CanViewMQTT:
                     # The conversion from raw values to SI-units are given in the rest of the tuple
                     values = [ (d // val) if isinstance(val, int) else (float(d) / val)
                               for d, val in zip(struct_t.unpack(data), value[1:]) ]
-                    # labels are given in any remaining portion of tuple beyond the scale factors
+                    # if labels were given, they are remaining portion of tuple beyond the scale factors
                     if len(value)-1 > len(values):   
                         labels = value[len(value)//2+1:]
-                        # combine the scaled values with the labels, for display on viewer
-                        values = zip( labels,values )
+                        # combine the scaled values with the labels, for display on viewer, 
+                        #   but it gets a little too cluttered.  just the scaled values are good.
+                        # values = zip( labels,values )
                 else:
                     # No conversion from SI-units is needed
                     struct_t = value  # type: struct.Struct
@@ -243,11 +244,15 @@ class CanViewMQTT:
             try:
                 values_list = []
                 values,labels = self.unpack_data(msg.arbitration_id, self.data_structs, msg.data)
-                for x in values:
+                for i,x in enumerate(values):
                     if isinstance(x, float):
                         values_list.append('{0:.3f}'.format(x))
                     else:
                         values_list.append(str(x))
+                    if labels:
+                        topic = arbitration_id_string + "_" + labels[i]     
+                        self.client.publish(topic, payload=x, qos=0, retain=False)
+
                 values_string = ' '.join(values_list)
                 self.draw_line(self.ids[key]['row'], 77, values_string, color)
             except (ValueError, struct.error):
