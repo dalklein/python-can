@@ -1,0 +1,17 @@
+001:>h:10.0
+002:>h:10.0
+010:<hhhh
+020:<hhhh
+031:<hhhh
+041:<hhhh
+051:<hhhh
+060:>h:10.0:BatTgtV
+070:<hhhh
+181:<LL:1000.0:1000.0:InvV:GrdV
+191:<Hhhh:1:1:1:1
+1B1:<BBBBBBBB
+1C1:<HHHH:1000.0:1:4.0:1:InvHz:b34:InvAbsW?:b78
+1E1:<ll:1:1:b14:b58
+1F1:<lHBB:1:1:1:1:b14:b56:b7:b8
+201:<ll:1:1:b14:b58
+221:<hhBBBB:100.0:1:1:1:1:1:b12:b34:b5:b6:b7:b8
