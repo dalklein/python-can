@@ -49,10 +49,11 @@ except ImportError:
 
 class CanViewMQTT:
 
-    def __init__(self, stdscr, bus, data_structs, testing=False):
+    def __init__(self, stdscr, bus, data_structs, quiet, testing=False):
         self.stdscr = stdscr
         self.bus = bus
         self.data_structs = data_structs
+        self.quiet = quiet
 
         # Initialise the ID dictionary, start timestamp, scroll and variable for pausing the viewer
         self.ids = {}
@@ -72,14 +73,15 @@ class CanViewMQTT:
         curses.init_pair(1, curses.COLOR_RED, -1)
         
         self.client = mqtt.Client() 
-        self.client.connect("localhost", 1883, 60)
+        self.client.connect("localhost", 1883, 60)  # mqtt broker is running on same device, standard port 1883
 
         if not testing:  # pragma: no cover
             self.run()
 
     def run(self):
         # Clear the terminal and draw the header
-        self.draw_header()
+        if not self.quiet:
+            self.draw_header()
 
         while 1:
             # Do not read the CAN-Bus when in paused mode
@@ -99,47 +101,48 @@ class CanViewMQTT:
             if key == KEY_ESC or key == ord('q'):
                 break
 
-            # Clear by pressing 'c'
-            elif key == ord('c'):
-                self.ids = {}
-                self.start_time = None
-                self.scroll = 0
-                self.draw_header()
-
-            # Sort by pressing 's'
-            elif key == ord('s'):
-                # Sort frames based on the CAN-Bus ID
-                self.draw_header()
-                for i, key in enumerate(sorted(self.ids.keys())):
-                    # Set the new row index, but skip the header
-                    self.ids[key]['row'] = i + 1
-
-                    # Do a recursive call, so the frames are repositioned
-                    self.draw_can_bus_message(self.ids[key]['msg'], sorting=True)
-
             # Pause by pressing space
             elif key == KEY_SPACE:
                 self.paused = not self.paused
 
-            # Scroll by pressing up/down
-            elif key == curses.KEY_UP:
-                # Limit scrolling, so the user do not scroll passed the header
-                if self.scroll > 0:
-                    self.scroll -= 1
-                    self.redraw_screen()
-            elif key == curses.KEY_DOWN:
-                # Limit scrolling, so the maximum scrolling position is one below the last line
-                if self.scroll <= len(self.ids) - self.y + 1:
-                    self.scroll += 1
-                    self.redraw_screen()
+            if not self.quiet:      # skip screen display functions if quiet
+                # Clear by pressing 'c'
+                if key == ord('c'):
+                    self.ids = {}
+                    self.start_time = None
+                    self.scroll = 0
+                    self.draw_header()
 
-            # Check if screen was resized
-            resized = curses.is_term_resized(self.y, self.x)
-            if resized is True:
-                self.y, self.x = self.stdscr.getmaxyx()
-                if hasattr(curses, 'resizeterm'):  # pragma: no cover
-                    curses.resizeterm(self.y, self.x)
-                self.redraw_screen()
+                # Sort by pressing 's'
+                elif key == ord('s'):
+                    # Sort frames based on the CAN-Bus ID
+                    self.draw_header()
+                    for i, key in enumerate(sorted(self.ids.keys())):
+                        # Set the new row index, but skip the header
+                        self.ids[key]['row'] = i + 1
+
+                        # Do a recursive call, so the frames are repositioned
+                        self.draw_can_bus_message(self.ids[key]['msg'], sorting=True)
+
+                # Scroll by pressing up/down
+                elif key == curses.KEY_UP:
+                    # Limit scrolling, so the user do not scroll passed the header
+                    if self.scroll > 0:
+                        self.scroll -= 1
+                        self.redraw_screen()
+                elif key == curses.KEY_DOWN:
+                    # Limit scrolling, so the maximum scrolling position is one below the last line
+                    if self.scroll <= len(self.ids) - self.y + 1:
+                        self.scroll += 1
+                        self.redraw_screen()
+
+                # Check if screen was resized
+                resized = curses.is_term_resized(self.y, self.x)
+                if resized is True:
+                    self.y, self.x = self.stdscr.getmaxyx()
+                    if hasattr(curses, 'resizeterm'):  # pragma: no cover
+                        curses.resizeterm(self.y, self.x)
+                    self.redraw_screen()
 
         # Shutdown the CAN-Bus interface
         self.bus.shutdown()
@@ -231,14 +234,15 @@ class CanViewMQTT:
         else:
             color = curses.color_pair(0)
 
-        # Now draw the CAN-Bus message on the terminal window
-        self.draw_line(self.ids[key]['row'], 0, str(self.ids[key]['count']), color)
-        self.draw_line(self.ids[key]['row'], 8, '{0:.6f}'.format(self.ids[key]['msg'].timestamp - self.start_time),
-                       color)
-        self.draw_line(self.ids[key]['row'], 23, '{0:.6f}'.format(self.ids[key]['dt']), color)
-        self.draw_line(self.ids[key]['row'], 35, arbitration_id_string, color)
-        self.draw_line(self.ids[key]['row'], 47, str(msg.dlc), color)
-        self.draw_line(self.ids[key]['row'], 52, data_string, color)
+        if not self.quiet:
+            # Now draw the CAN-Bus message on the terminal window
+            self.draw_line(self.ids[key]['row'], 0, str(self.ids[key]['count']), color)
+            self.draw_line(self.ids[key]['row'], 8, '{0:.6f}'.format(self.ids[key]['msg'].timestamp - self.start_time),
+                        color)
+            self.draw_line(self.ids[key]['row'], 23, '{0:.6f}'.format(self.ids[key]['dt']), color)
+            self.draw_line(self.ids[key]['row'], 35, arbitration_id_string, color)
+            self.draw_line(self.ids[key]['row'], 47, str(msg.dlc), color)
+            self.draw_line(self.ids[key]['row'], 52, data_string, color)
 
         if self.data_structs:
             try:
@@ -254,7 +258,8 @@ class CanViewMQTT:
                         self.client.publish(topic, payload=x, qos=0, retain=False)
 
                 values_string = ' '.join(values_list)
-                self.draw_line(self.ids[key]['row'], 77, values_string, color)
+                if not self.quiet:
+                    self.draw_line(self.ids[key]['row'], 77, values_string, color)
             except (ValueError, struct.error):
                 pass
 
@@ -345,7 +350,7 @@ def parse_args(args):
 
     # Parse command line arguments
     parser = argparse.ArgumentParser('python -m can.viewmqtt',
-                                     description='A simple CAN viewer terminal application written in Python',
+                                     description='A simple Python CAN viewer application with mqtt output',
                                      epilog='R|Shortcuts: '
                                             '\n        +---------+-------------------------+'
                                             '\n        |   Key   |       Description       |'
@@ -361,6 +366,8 @@ def parse_args(args):
     optional = parser.add_argument_group('Optional arguments')
 
     optional.add_argument('-h', '--help', action='help', help='Show this help message and exit')
+
+    optional.add_argument('-q', '--quiet', action='store_true', help='Suppress text output, to run with mqtt output only')
 
     optional.add_argument('--version', action='version', help="Show program's version number and exit",
                           version='%(prog)s (version {version})'.format(version=__version__))
@@ -429,7 +436,7 @@ def parse_args(args):
         raise SystemExit(errno.EINVAL)
 
     parsed_args = parser.parse_args(args)
-
+    
     can_filters = []
     if len(parsed_args.filter) > 0:
         # print('Adding filter/s', parsed_args.filter)
@@ -513,11 +520,13 @@ def main():  # pragma: no cover
     if parsed_args.bitrate:
         config['bitrate'] = parsed_args.bitrate
 
+    quiet = parsed_args.quiet    
+
     # Create a CAN-Bus interface
     bus = can.Bus(parsed_args.channel, **config)
     # print('Connected to {}: {}'.format(bus.__class__.__name__, bus.channel_info))
 
-    curses.wrapper(CanViewMQTT, bus, data_structs)
+    curses.wrapper(CanViewMQTT, bus, data_structs, quiet)
 
 
 if __name__ == '__main__':  # pragma: no cover
