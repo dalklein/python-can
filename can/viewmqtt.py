@@ -50,10 +50,11 @@ except ImportError:
 class CanViewMQTT:
 
     def __init__(self, stdscr, bus, data_structs, quiet, testing=False):
-        self.stdscr = stdscr
         self.bus = bus
         self.data_structs = data_structs
         self.quiet = quiet
+        if not self.quiet:
+            self.stdscr = stdscr
 
         # Initialise the ID dictionary, start timestamp, scroll and variable for pausing the viewer
         self.ids = {}
@@ -62,15 +63,18 @@ class CanViewMQTT:
         self.paused = False
 
         # Get the window dimensions - used for resizing the window
-        self.y, self.x = self.stdscr.getmaxyx()
+        if not self.quiet:
+            self.y, self.x = self.stdscr.getmaxyx()
 
         # Do not wait for key inputs, disable the cursor and choose the background color automatically
-        self.stdscr.nodelay(True)
-        curses.curs_set(0)
-        curses.use_default_colors()
+        if not self.quiet:
+            self.stdscr.nodelay(True)
+            curses.curs_set(0)
+            curses.use_default_colors()
 
         # Used to color error frames red
-        curses.init_pair(1, curses.COLOR_RED, -1)
+        if not self.quiet:
+            curses.init_pair(1, curses.COLOR_RED, -1)
         
         self.client = mqtt.Client() 
         self.client.connect("localhost", 1883, 60)  # mqtt broker is running on same device, standard port 1883
@@ -95,15 +99,16 @@ class CanViewMQTT:
                 time.sleep(1. / 1000.)
 
             # Read the terminal input
-            key = self.stdscr.getch()
+            if not self.quiet:
+                key = self.stdscr.getch()
 
             # Stop program if the user presses ESC or 'q'
-            if key == KEY_ESC or key == ord('q'):
-                break
+                if key == KEY_ESC or key == ord('q'):
+                    break
 
             # Pause by pressing space
-            elif key == KEY_SPACE:
-                self.paused = not self.paused
+                elif key == KEY_SPACE:
+                    self.paused = not self.paused
 
             if not self.quiet:      # skip screen display functions if quiet
                 # Clear by pressing 'c'
@@ -228,13 +233,14 @@ class CanViewMQTT:
         if msg.dlc > 0:
             data_string = ' '.join('{:02X}'.format(x) for x in msg.data)
 
-        # Use red for error frames
-        if msg.is_error_frame:
-            color = curses.color_pair(1)
-        else:
-            color = curses.color_pair(0)
 
         if not self.quiet:
+            # Use red for error frames
+            if msg.is_error_frame:
+                color = curses.color_pair(1)
+            else:
+                color = curses.color_pair(0)
+
             # Now draw the CAN-Bus message on the terminal window
             self.draw_line(self.ids[key]['row'], 0, str(self.ids[key]['count']), color)
             self.draw_line(self.ids[key]['row'], 8, '{0:.6f}'.format(self.ids[key]['msg'].timestamp - self.start_time),
@@ -524,9 +530,12 @@ def main():  # pragma: no cover
 
     # Create a CAN-Bus interface
     bus = can.Bus(parsed_args.channel, **config)
-    # print('Connected to {}: {}'.format(bus.__class__.__name__, bus.channel_info))
+    print('Connected to {}: {}'.format(bus.__class__.__name__, bus.channel_info))
 
-    curses.wrapper(CanViewMQTT, bus, data_structs, quiet)
+    if quiet:
+        CanViewMQTT(None, bus, data_structs, quiet)
+    else:
+        curses.wrapper(CanViewMQTT, bus, data_structs, quiet)
 
 
 if __name__ == '__main__':  # pragma: no cover
