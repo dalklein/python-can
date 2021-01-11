@@ -260,11 +260,13 @@ class CanViewMQTT:
                     else:
                         values_list.append(str(x))
                     if labels:
-                        topic = arbitration_id_string + "_" + labels[i]     
+                        topic = arbitration_id_string[2:] + "_" + labels[i]     
                         self.client.publish(topic, payload=x, qos=0, retain=False)
+                    # comment out following line for no labels in terminal, for scaled signals only
+                        values_list.append(labels[i])  
 
-                values_string = ' '.join(values_list)
                 if not self.quiet:
+                    values_string = ' '.join(values_list)
                     self.draw_line(self.ids[key]['row'], 77, values_string, color)
             except (ValueError, struct.error):
                 pass
@@ -356,7 +358,7 @@ def parse_args(args):
 
     # Parse command line arguments
     parser = argparse.ArgumentParser('python -m can.viewmqtt',
-                                     description='A simple Python CAN viewer application with mqtt output',
+                                     description='A simple Python CAN viewer, with optional mqtt output',
                                      epilog='R|Shortcuts: '
                                             '\n        +---------+-------------------------+'
                                             '\n        |   Key   |       Description       |'
@@ -373,7 +375,9 @@ def parse_args(args):
 
     optional.add_argument('-h', '--help', action='help', help='Show this help message and exit')
 
-    optional.add_argument('-q', '--quiet', action='store_true', help='Suppress text output, to run with mqtt output only')
+    optional.add_argument('-q', '--quiet', action='store_true', 
+                          help='Suppress text output, to run with mqtt output of labeled signals,'
+                               '\n  and allows script to be run in background with &.')
 
     optional.add_argument('--version', action='version', help="Show program's version number and exit",
                           version='%(prog)s (version {version})'.format(version=__version__))
@@ -412,6 +416,13 @@ def parse_args(args):
                                '\nneeds to be divided by 10 and 100 respectively:'
                                '\n  $ python -m can.viewer -d "101:<BHL:1:10.0:100.0"'
                                '\nBe aware that integer division is performed if the scaling value is an integer.'
+                               '\nScaled signals may be labeled and output to mqtt messages.  Labels are'
+                               '\n  allowed for each scaled signal.  The number of scaling'
+                               '\n  values and labels must match the number of decoded items per CAN ID.'
+                               '\n  MQTT messages are published to localhost on the standard MQTT port 1883,'
+                               '\n   and this requires an MQTT broker (ie: mosquitto) to be running locally.'
+                               '\n  MQTT topic is the message ID concatenated with the signal label.'
+                               '\n  $ python -m can.viewer -d "101:<BHL:1:10.0:100.0:SigB:SigH:SigL"'
                                '\nMultiple arguments are separated by spaces:'
                                '\n  $ python -m can.viewer -d "100:<BHL" "101:<BHL:1:10.0:100.0"'
                                '\nAlternatively a file containing the conversion strings separated by new lines'
@@ -419,6 +430,7 @@ def parse_args(args):
                                 '\n  $ cat file.txt'
                                 '\n      100:<BHL'
                                 '\n      101:<BHL:1:10.0:100.0'
+                                '\n      102:<BHL:1:10.0:100.0:SigB:SigH:SigL'
                                 '\n  $ python -m can.viewer -d file.txt',
                           metavar='{<id>:<format>,<id>:<format>:<scaling1>:...:<scalingN>,file.txt}',
                           nargs=argparse.ONE_OR_MORE, default='')
