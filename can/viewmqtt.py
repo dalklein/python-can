@@ -76,8 +76,9 @@ class CanViewMQTT:
         if not self.quiet:
             curses.init_pair(1, curses.COLOR_RED, -1)
         
-        self.client = mqtt.Client() 
-        self.client.connect("localhost", 1883, 60)  # mqtt broker is running on same device, standard port 1883
+        if self.quiet:
+            self.client = mqtt.Client() 
+            self.client.connect("localhost", 1883, 60)  # mqtt broker is running on same device, standard port 1883
 
         if not testing:  # pragma: no cover
             self.run()
@@ -261,7 +262,8 @@ class CanViewMQTT:
                         values_list.append(str(x))
                     if labels:
                         topic = arbitration_id_string[2:] + "_" + labels[i]     
-                        self.client.publish(topic, payload=x, qos=0, retain=False)
+                        if self.quiet:
+                            self.client.publish(topic, payload=x, qos=0, retain=False)    
                     # comment out following line for no labels in terminal, for scaled signals only
                         values_list.append(labels[i])  
 
@@ -419,7 +421,8 @@ def parse_args(args):
                                '\nScaled signals may be labeled and output to mqtt messages.  Labels are'
                                '\n  allowed for each scaled signal.  The number of scaling'
                                '\n  values and labels must match the number of decoded items per CAN ID.'
-                               '\n  MQTT messages are published to localhost on the standard MQTT port 1883,'
+                               '\nIf quiet mode -q is used, then any labeled signals will be output with'
+                               '\n  MQTT messages published to localhost on the standard MQTT port 1883,'
                                '\n   and this requires an MQTT broker (ie: mosquitto) to be running locally.'
                                '\n  MQTT topic is the message ID concatenated with the signal label.'
                                '\n  $ python -m can.viewer -d "101:<BHL:1:10.0:100.0:SigB:SigH:SigL"'
