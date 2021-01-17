@@ -100,7 +100,7 @@ class CanViewMQTT:
                 time.sleep(1. / 1000.)
 
             # Read the terminal input
-            if not self.quiet:
+            if not self.quiet:      # skip key functions if quiet
                 key = self.stdscr.getch()
 
             # Stop program if the user presses ESC or 'q'
@@ -111,9 +111,8 @@ class CanViewMQTT:
                 elif key == KEY_SPACE:
                     self.paused = not self.paused
 
-            if not self.quiet:      # skip screen display functions if quiet
                 # Clear by pressing 'c'
-                if key == ord('c'):
+                elif key == ord('c'):
                     self.ids = {}
                     self.start_time = None
                     self.scroll = 0
@@ -217,8 +216,14 @@ class CanViewMQTT:
                 # and the forth index is the time since the previous message
                 self.ids[key] = {'row': row, 'count': 0, 'msg': msg, 'dt': 0}
             else:
-                # Calculate the time since the last message and save the timestamp
-                self.ids[key]['dt'] = msg.timestamp - self.ids[key]['msg'].timestamp
+                deltat = msg.timestamp - self.ids[key]['msg'].timestamp
+                if self.quiet:        # if mqtt output enabled, 
+                    if (deltat < .5):       # if message rate is < xx sec
+                        self.ids[key]['count'] += 1      # update counter
+                        return self.ids[key]              # and return, skipping processing and output
+                else:    
+                    # Calculate the time since the last message and save the timestamp
+                    self.ids[key]['dt'] = msg.timestamp - self.ids[key]['msg'].timestamp
 
                 # Copy the CAN-Bus frame - this is used for sorting
                 self.ids[key]['msg'] = msg
